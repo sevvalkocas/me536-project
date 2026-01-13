@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 # --- SETTINGS ---
-DATASET_PATH = "./fruit_dataset/fruits-360_100x100/fruits-360/Training"
+DATASET_PATH = "./fruit_dataset/fruits-360_100x100/fruits-360/deneme"
 OUTPUT_FEATURES = "features.npy"
 OUTPUT_LABELS = "labels.npy"
 
@@ -17,7 +17,7 @@ OUTPUT_LABELS = "labels.npy"
 def get_label(folder_name):
     name = folder_name.lower()
     if 'apple' in name: return 0
-    if 'banana' in name: return 1
+    if 'cucumber' in name: return 1
     return 2 # Treat everything else as a 3rd class
 
 # --- MODEL SETUP ---
