@@ -6,10 +6,8 @@ GRAVITY = 0.15
 SPAWN_RATE = 0.05
 
 def spawn_and_physics(fruits, frame, fruit_assets):
-    """Meyveleri oluşturur ve aşağı düşürür."""
-    # --- A. OYUN MOTORU (Fizik ve Spawn) ---
     if random.random() < SPAWN_RATE:
-        f_type = 'apple' if random.random() < 0.70 else 'banana'
+        f_type = 'apple' if random.random() < 0.70 else 'bomb'
         fruits.append([random.randint(100, WIDTH-100), -50, random.uniform(-1.2, 1.2), 0, f_type])
 
     for i in range(len(fruits)-1, -1, -1):
@@ -17,11 +15,36 @@ def spawn_and_physics(fruits, frame, fruit_assets):
         fruits[i][3] += GRAVITY
         cx, cy, real_type = int(fruits[i][0]), int(fruits[i][1]), fruits[i][4]
         
-        if 30 < cx < WIDTH-30 and -50 < cy < HEIGHT-30:
-            if cy > 30: frame[cy-30:cy+30, cx-30:cx+30] = fruit_assets[real_type]
+        asset = fruit_assets[real_type]
+        h, w = asset.shape[:2]
+
+        # 1. EKRAN ÜZERİNDEKİ ÇİZİM ALANINI BELİRLE (Frame Coordinates)
+        y1, y2 = max(0, cy - h//2), min(HEIGHT, cy + h//2)
+        x1, x2 = max(0, cx - w//2), min(WIDTH, cx + w//2)
+
+        # 2. GÖRSEL ÜZERİNDEKİ KIRPMA ALANINI BELİRLE (Asset Coordinates)
+        # Ekran dışına taşan kısımları görselden de kırpıyoruz
+        ay1 = max(0, h//2 - cy)
+        ay2 = ay1 + (y2 - y1)
+        ax1 = max(0, w//2 - cx)
+        ax2 = ax1 + (x2 - x1)
+
+        # 3. GEÇERLİLİK KONTROLÜ
+        # Sadece çizilecek bir alan varsa işlem yap (Broadcast hatasını önler)
+        if y2 > y1 and x2 > x1 and (ay2-ay1) == (y2-y1) and (ax2-ax1) == (x2-x1):
+            asset_crop = asset[ay1:ay2, ax1:ax2]
+            
+            if asset_crop.shape[2] == 4: # Alpha Blending (PNG)
+                alpha_s = asset_crop[:, :, 3] / 255.0
+                alpha_l = 1.0 - alpha_s
+                for c in range(3):
+                    frame[y1:y2, x1:x2, c] = (alpha_s * asset_crop[:, :, c] +
+                                              alpha_l * frame[y1:y2, x1:x2, c])
+            else: # Normal Yapıştırma (JPEG)
+                frame[y1:y2, x1:x2] = asset_crop[:, :, :3]
         
-        # Ekrandan çıkan meyveleri sil
-        if fruits[i][1] > HEIGHT + 50: fruits.pop(i)
+        if fruits[i][1] > HEIGHT + 50: 
+            fruits.pop(i)
 
 def draw_detection_boxes(frame, detected_objects):
     """AI'nın tespit ettiği nesnelerin etrafına kutu ve etiket çizer."""
@@ -34,8 +57,8 @@ def draw_detection_boxes(frame, detected_objects):
         
         # Kutu Çizimi (Nesnenin merkezinden dışarı doğru 35 piksellik bir kare)
         cv2.rectangle(frame, 
-                      (pos[0]-35, pos[1]-35), 
-                      (pos[0]+35, pos[1]+35), 
+                      (pos[0]-30, pos[1]-30), 
+                      (pos[0]+30, pos[1]+30), 
                       color, 1)
         
         # Etiket Yazımı

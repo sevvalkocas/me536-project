@@ -9,16 +9,19 @@ import numpy as np
 from tqdm import tqdm
 
 # --- SETTINGS ---
-DATASET_PATH = "./fruit_dataset/fruits-360_100x100/fruits-360/deneme"
+DATASET_PATH = "./fruit_dataset/dataset/train"
 OUTPUT_FEATURES = "features.npy"
 OUTPUT_LABELS = "labels.npy"
 
-# Mapping: 0 = Apple, 1 = Banana, 2 = Other (Cherry, Peach, etc. - treated as 'Obstacles/Bombs')
+# Mapping: 0 = Apple, 1 = Banana, 2 = Cucumber, 3 = Eggplant, 4 = Orange
 def get_label(folder_name):
     name = folder_name.lower()
     if 'apple' in name: return 0
-    if 'cucumber' in name: return 1
-    return 2 # Treat everything else as a 3rd class
+    if 'banana' in name: return 1
+    if 'cucumber' in name: return 2
+    if 'eggplant' in name: return 3
+    if 'orange' in name: return 4
+    return 5
 
 # --- MODEL SETUP ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

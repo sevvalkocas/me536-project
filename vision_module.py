@@ -6,7 +6,6 @@ import torchvision.transforms as transforms
 import numpy as np
 import cv2
 
-# 1. Model Mimarisini Buraya da Ekle (Aynı eğittiğin gibi olmalı)
 class FruitBrain(nn.Module):
     def __init__(self):
         super(FruitBrain, self).__init__()
@@ -16,7 +15,7 @@ class FruitBrain(nn.Module):
             nn.Dropout(0.3),
             nn.Linear(512, 128),
             nn.ReLU(),
-            nn.Linear(128, 3) # 0: Apple, 1: Cucumber, 2: Bomb/Other
+            nn.Linear(128, 5) 
         )
 
     def forward(self, x):
@@ -47,39 +46,64 @@ class VisionAI:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
 
-    def extract_features(self, frame, x, y):
-        try:
-            roi = frame[max(0, y-30):min(frame.shape[0], y+30), 
-                        max(0, x-30):min(frame.shape[1], x+30)]
-            if roi.size == 0: return None
-            input_tensor = self.preprocess(roi).unsqueeze(0).to(self.device)
-            with torch.no_grad():
-                features = self.resnet(input_tensor)
-            return features.cpu().numpy().flatten()
-        except:
-            return None
-
-    def classify_fruit(self, features):
-        if features is None: return "unknown"
+    def extract_features(self, frame, cx, cy):
+        # 1. Meyvenin olduğu bölgeyi kırp (ROI)
+        size = 50 # 100 çok büyük olabilir, 50-60 genellikle yeterlidir
+        y1, y2 = max(0, cy-size), min(frame.shape[0], cy+size)
+        x1, x2 = max(0, cx-size), min(frame.shape[1], cx+size)
+        patch = frame[y1:y2, x1:x2].copy()
         
+        if patch.size == 0: return None
+
+        # 2. HIZLI MASKELEME (Rembg Yerine)
+        # Arka plan beyaz (255) olduğu için beyaza yakın her şeyi şeffaf/beyaz kabul edeceğiz
+        gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
+        
+        # Arka plan beyazsa (255), 240'tan büyük değerleri maskele (arka planı seç)
+        # Eğer arka planın siyahsa cv2.THRESH_BINARY kullanmalısın
+        _, mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
+        
+        # Maskelenen (arka plan) kısımları tam beyaza boya (Modelin için temizlik)
+        patch[mask == 255] = [255, 255, 255]
+        
+        # 3. ResNet Ön İşleme ve Özellik Çıkarma
+        # OpenCV (BGR) -> RGB çevrimi yapmayı unutma
+        patch_rgb = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB)
+        input_tensor = self.preprocess(patch_rgb).unsqueeze(0).to(self.device)
+        
+        with torch.no_grad():
+            features = self.resnet(input_tensor)
+        
+        return features.cpu().numpy().flatten()
+        
+    def classify_fruit(self, features):
+        if features is None: return "avoid"
         feat_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            output = self.brain(feat_tensor) # Artık self.brain tanımlı!
+            output = self.brain(feat_tensor)
             probs = torch.nn.functional.softmax(output, dim=1)
             conf, idx = torch.max(probs, dim=1)
-            
-        THRESHOLD = 0.85
-        if conf.item() < THRESHOLD: return "unknown"
         
-        mapping = {0: "apple", 1: "unknown", 2: "unknown"}
-        return mapping.get(idx.item(), "unknown")
+        if conf.item() < 0.70: return "avoid" # Güven düşükse dokunma
+
+        # Eğitimdeki get_label fonksiyonunla aynı sırayı takip etmeli:
+        # 0: Apple, 1: Banana, 2: Cucumber, 3: Eggplant, 4: Orange, 5: Other
+        mapping = {
+            0: "apple", 
+            1: "banana", # Bu bir engel (avoid)
+            2: "cucumber", 
+            3: "eggplant", 
+            4: "orange", 
+            5: "avoid"
+        }
+        return mapping.get(idx.item(), "avoid")
     
     def find_and_classify(self, frame):
         # 1. Ekrandaki nesneleri bul (Basit bir kontur analizi ile)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         # Beyaz arka planda olmayan her şeyi bul (thresholding)
         _, thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
-        contours, _ = cv2.find_centers = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         detections = []
         for cnt in contours:

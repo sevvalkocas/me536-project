@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 # --- 1. SETTINGS ---
 INPUT_SIZE = 2048  # ResNet50 feature size
 HIDDEN_SIZE = 512
-NUM_CLASSES = 3    # 0: Apple, 1: Banana, 2: Other/Bomb
 BATCH_SIZE = 64
 EPOCHS = 20
 LEARNING_RATE = 0.001
@@ -17,7 +16,8 @@ LEARNING_RATE = 0.001
 print("Loading features and labels...")
 X = np.load("features.npy")
 y = np.load("labels.npy")
-
+NUM_CLASSES = len(np.unique(y)) 
+print(f"Tespit edilen sınıf sayısı: {NUM_CLASSES}")
 # Split into Train (80%) and Test (20%)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 

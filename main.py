@@ -18,11 +18,11 @@ planner = PathFinder(WIDTH, HEIGHT, 25)
 search_planner = SearchPlanner(WIDTH, HEIGHT, 25)
 
 try:
-    apple_img = cv2.resize(cv2.imread("apple.png"), (60, 60))
-    banana_img = cv2.resize(cv2.imread("banana.png"), (60, 60))
+    apple_img = cv2.resize(cv2.imread("apple.jpeg"), (60, 60))
+    bomb_img = cv2.resize(cv2.imread("bomb.jpeg"), (60, 60))
     knife_raw = cv2.imread("no_bg_knife.png", cv2.IMREAD_UNCHANGED)
     knife_img = cv2.resize(knife_raw, (50, 50))
-    fruit_assets = {'apple': apple_img, 'banana': banana_img}
+    fruit_assets = {'apple': apple_img, 'bomb': bomb_img}
 except Exception as e:
     print(f"HATA: Görseller yüklenemedi: {e}")
     sys.exit()
@@ -49,15 +49,14 @@ while True:
 
         for obj in detected_objects:
             pos = obj['pos']
-            label = obj['label'] # 'apple', 'cucumber', 'avoid'
-            
-            if label in ["apple", "cucumber"]:
+            label = obj['label']
+            if label in ["apple", "banana", "cucumber", "eggplant", "orange"]:
                 if pos[1] > WAIT_THRESHOLD:
                     # En yakın/en üstteki hedefi belirle
                     if ai_target is None or pos[1] > ai_target[1]:
                         ai_target = pos
             elif label == "avoid":
-                ai_obstacles.append([pos[0], pos[1], "banana"])
+                ai_obstacles.append([pos[0], pos[1], "avoid"])
 
         # Yol Planlama
         # path = planner.a_star(tuple(blade_pos), ai_target, ai_obstacles)
@@ -72,14 +71,14 @@ while True:
             dist = np.linalg.norm(np.array(blade_pos) - np.array([fruits[i][0], fruits[i][1]]))
             real_type = fruits[i][4]
             
-            if dist < 45:
+            if dist < 25:
                 features = vision.extract_features(frame, int(fruits[i][0]), int(fruits[i][1]))
                 prediction = vision.classify_fruit(features)
-                
-                if prediction in ["apple", "cucumber"] and real_type != 'banana':
+
+                if prediction in ["apple", "banana", "cucumber", "eggplant", "orange"] and real_type != 'bomb':
                     cv2.circle(frame, (int(fruits[i][0]), int(fruits[i][1])), 50, (255, 255, 255), -1)
                     fruits.pop(i)
-                elif real_type == 'banana':
+                elif real_type == 'bomb':
                     game_over = True
 
         draw_blade_and_trail(frame, blade_pos, blade_history, knife_img, TRAIL_LENGTH)
