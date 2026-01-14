@@ -10,6 +10,10 @@ WIDTH, HEIGHT = 800, 600
 WAIT_THRESHOLD = 200   # AI'nın nesneyi algılayıp tepki vermesi için gereken dikey sınır
 BLADE_SPEED = 5      # AI bıçağının hızı
 TRAIL_LENGTH = 10
+fruit_values = {
+    'apple': 10, 'orange': 15, 'cucumber': 20, 
+    'eggplant': 25, 'banana': 30, 'new_fruit': 50
+}
 
 # --- 2. SİSTEMLERİ BAŞLAT ---
 # VisionAI artık hem 'find' (bulma) hem 'classify' (tanıma) işini yapacak
@@ -23,6 +27,7 @@ try:
     cucumber_img = cv2.resize(cv2.imread("cucumber.jpeg"), (60, 60))
     eggplant_img = cv2.resize(cv2.imread("eggplant.jpeg"), (60, 60))
     orange_img = cv2.resize(cv2.imread("orange.jpeg"), (60, 60))
+    # watermelon_img = cv2.resize(cv2.imread("cherry.jpeg"), (60, 60))
     bomb_img = cv2.resize(cv2.imread("bomb.jpeg"), (50, 50))
     knife_raw = cv2.imread("no_bg_knife.png", cv2.IMREAD_UNCHANGED)
     knife_img = cv2.resize(knife_raw, (50, 50))
@@ -32,9 +37,9 @@ except Exception as e:
     sys.exit()
 
 def reset_game():
-    return [WIDTH//2, HEIGHT-50], [], [], False
+    return [WIDTH//2, HEIGHT-50], [], [], False, 0
 
-blade_pos, blade_history, fruits, game_over = reset_game()
+blade_pos, blade_history, fruits, game_over, score = reset_game()
 
 # --- 3. ANA OYUN VE AI DÖNGÜSÜ ---
 while True:
@@ -72,32 +77,70 @@ while True:
         # --- C. ETKİLEŞİM VE ÇARPIŞMA ---
         # AI hedefe ulaştıysa kesme işlemi
         for i in range(len(fruits)-1, -1, -1):
-            dist = np.linalg.norm(np.array(blade_pos) - np.array([fruits[i][0], fruits[i][1]]))
-            real_type = fruits[i][4]
+            fx, fy, _, _, real_type = fruits[i]
+            dist = np.linalg.norm(np.array(blade_pos) - np.array([fx, fy]))
             
-            if dist < 60:
-                features = vision.extract_features(frame, int(fruits[i][0]), int(fruits[i][1]))
+            # 1. KESME MANTIĞI
+            if dist < 45:
+                features = vision.extract_features(frame, int(fx), int(fy))
                 prediction = vision.classify_fruit(features)
+                
+                # AI tanıyorsa VEYA hafızasından hatırlıyorsa KES
+                if prediction != "avoid" or vision.is_in_memory(features):
+                    if real_type != 'bomb':
+                        label = prediction if prediction != "avoid" else "new_fruit"
+                        score += fruit_values.get(label, 10)
+                        print(f"KESİLDİ! Tip: {label} | Puan: {score}")
+                        cv2.circle(frame, (int(fx), int(fy)), 50, (255, 255, 255), -1)
+                        fruits.pop(i)
+                    else:
+                        game_over = True # Bombayı kestik!
 
-                if prediction in ["apple", "banana", "cucumber", "eggplant", "orange"] and real_type != 'bomb':
-                    cv2.circle(frame, (int(fruits[i][0]), int(fruits[i][1])), 50, (255, 255, 255), -1)
-                    fruits.pop(i)
-                elif real_type == 'bomb':
-                    game_over = True
-
+        # --- D. DÜŞENLERİ TAKİP ET (ÖĞRENME BURADA) ---
+        for i in range(len(fruits)-1, -1, -1):
+            if fruits[i][1] > HEIGHT: # Meyve ekranın altına düştüyse
+                real_type = fruits[i][4]
+                
+                if real_type != 'bomb':
+                    # Bilmediğimiz bir meyve düştü, puan kaybet ve ÖĞREN!
+                    score -= 5
+                    print(f"Meyve Kaçırıldı! -5 Puan. Güncel Score: {score}")
+                    
+                    # Bu meyvenin özelliklerini çıkar ve hafızaya ekle
+                    missed_features = vision.extract_features(frame, int(fruits[i][0]), int(fruits[i][1]))
+                    if missed_features is not None:
+                        vision.missed_fruits_memory.append(missed_features)
+                        print("YENİ BİR MEYVE ÖĞRENİLDİ: Gelecekte bunu keseceğim!")
+                
+                fruits.pop(i)
+        cv2.putText(frame, f"SCORE: {score}", (20, 40), cv2.FONT_HERSHEY_DUPLEX, 1.0, (50, 50, 50), 2)
+        cv2.putText(frame, f"MEM: {len(vision.missed_fruits_memory)} items", (20, 70), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 1)
         draw_blade_and_trail(frame, blade_pos, blade_history, knife_img, TRAIL_LENGTH)
 
     else:
-        # Game Over Ekranı
+        # --- OYUN BİTTİ EKRANI ---
         overlay = frame.copy()
+        # Ekranı karart (Siyah transparan katman)
         cv2.rectangle(overlay, (0,0), (WIDTH, HEIGHT), (0,0,0), -1)
-        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
-        cv2.putText(frame, "AI GAME OVER", (WIDTH//2-180, HEIGHT//2), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0,0,255), 3)
-        cv2.putText(frame, "[R] Restart  [Q] Quit", (WIDTH//2-150, HEIGHT//2+60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        # "GAME OVER" Başlığı
+        cv2.putText(frame, "AI PERFORMANCE REPORT", (WIDTH//2-220, HEIGHT//2-100), 
+                    cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 0, 255), 2)
+        # Skor Bilgileri
+        cv2.putText(frame, f"FINAL SCORE: {score}", (WIDTH//2-120, HEIGHT//2-30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        # Hafıza (Öğrenme) Bilgisi
+        learned_count = len(vision.missed_fruits_memory)
+        cv2.putText(frame, f"NEW SPECIES LEARNED: {learned_count}", (WIDTH//2-160, HEIGHT//2+20), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 1)
+        # Kontroller
+        cv2.putText(frame, "Press [R] to Restart or [Q] to Quit", (WIDTH//2-180, HEIGHT//2+80), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
     cv2.imshow("Autonomous Gamer AI", frame)
     key = cv2.waitKey(30) & 0xFF
     if key == ord('q'): break
-    if key == ord('r') and game_over: blade_pos, blade_history, fruits, game_over = reset_game()
+    if key == ord('r') and game_over: blade_pos, blade_history, fruits, game_over, score = reset_game()
 
 cv2.destroyAllWindows()

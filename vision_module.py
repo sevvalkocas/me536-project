@@ -24,12 +24,13 @@ class FruitBrain(nn.Module):
 class VisionAI:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
         # ResNet Feature Extractor
         self.resnet = models.resnet50(weights=ResNet50_Weights.DEFAULT).to(self.device)
         self.resnet.fc = nn.Identity()
         self.resnet.eval()
 
+        self.missed_fruits_memory = [] # Puan kaybettiğimiz meyvelerin feature vektörleri
+        self.similarity_threshold = 0.92 # Benzerlik eşiği (Cosine Similarity)
         # --- BURASI KRİTİK: self.brain BURADA TANIMLANMALI ---
         self.brain = FruitBrain().to(self.device)
         try:
@@ -84,7 +85,7 @@ class VisionAI:
             probs = torch.nn.functional.softmax(output, dim=1)
             conf, idx = torch.max(probs, dim=1)
         
-        if conf.item() < 0.70: return "avoid" # Güven düşükse dokunma
+        if conf.item() < 0.75: return "avoid" # Güven düşükse dokunma
 
         # Eğitimdeki get_label fonksiyonunla aynı sırayı takip etmeli:
         # 0: Apple, 1: Banana, 2: Cucumber, 3: Eggplant, 4: Orange, 5: Other
@@ -119,3 +120,19 @@ class VisionAI:
                 detections.append({'pos': (cx, cy), 'label': label})
                 
         return detections
+    
+    def is_in_memory(self, current_features):
+        """Şu anki objenin hafızadaki kaçırılmış meyvelere benzeyip benzemediğini kontrol eder."""
+        if not self.missed_fruits_memory:
+            return False
+        
+        current_feat_tensor = torch.tensor(current_features).to(self.device)
+        
+        for remembered_feat in self.missed_fruits_memory:
+            remembered_tensor = torch.tensor(remembered_feat).to(self.device)
+            # Cosine Similarity (Vektörler arası benzerlik) hesapla
+            similarity = F.cosine_similarity(current_feat_tensor.unsqueeze(0), 
+                                             remembered_tensor.unsqueeze(0))
+            if similarity.item() > self.similarity_threshold:
+                return True
+        return False

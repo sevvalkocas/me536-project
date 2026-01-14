@@ -9,7 +9,7 @@ def spawn_and_physics(fruits, frame, fruit_assets):
     if random.random() < SPAWN_RATE:
         if random.random() < 0.70:
             # %70 ihtimalle meyvelerden biri (Sepet mantığı)
-            f_type = random.choice(['apple', 'banana', 'cucumber', 'eggplant'])
+            f_type = random.choice(['apple', 'banana', 'cucumber', 'eggplant', 'orange'])
         else:
             # %30 ihtimalle bomba
             f_type = 'bomb'
