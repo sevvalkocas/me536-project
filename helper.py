@@ -7,7 +7,12 @@ SPAWN_RATE = 0.05
 
 def spawn_and_physics(fruits, frame, fruit_assets):
     if random.random() < SPAWN_RATE:
-        f_type = 'apple' if random.random() < 0.70 else 'bomb'
+        if random.random() < 0.70:
+            # %70 ihtimalle meyvelerden biri (Sepet mantığı)
+            f_type = random.choice(['apple', 'banana', 'cucumber', 'eggplant'])
+        else:
+            # %30 ihtimalle bomba
+            f_type = 'bomb'
         fruits.append([random.randint(100, WIDTH-100), -50, random.uniform(-1.2, 1.2), 0, f_type])
 
     for i in range(len(fruits)-1, -1, -1):

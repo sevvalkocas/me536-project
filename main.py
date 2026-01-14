@@ -19,10 +19,14 @@ search_planner = SearchPlanner(WIDTH, HEIGHT, 25)
 
 try:
     apple_img = cv2.resize(cv2.imread("apple.jpeg"), (60, 60))
-    bomb_img = cv2.resize(cv2.imread("bomb.jpeg"), (60, 60))
+    banana_img = cv2.resize(cv2.imread("banana.jpg"), (60, 60))
+    cucumber_img = cv2.resize(cv2.imread("cucumber.jpeg"), (60, 60))
+    eggplant_img = cv2.resize(cv2.imread("eggplant.jpeg"), (60, 60))
+    orange_img = cv2.resize(cv2.imread("orange.jpeg"), (60, 60))
+    bomb_img = cv2.resize(cv2.imread("bomb.jpeg"), (50, 50))
     knife_raw = cv2.imread("no_bg_knife.png", cv2.IMREAD_UNCHANGED)
     knife_img = cv2.resize(knife_raw, (50, 50))
-    fruit_assets = {'apple': apple_img, 'bomb': bomb_img}
+    fruit_assets = {'apple': apple_img, 'banana': banana_img, 'cucumber': cucumber_img, 'eggplant': eggplant_img, 'orange': orange_img, 'bomb': bomb_img}
 except Exception as e:
     print(f"HATA: Görseller yüklenemedi: {e}")
     sys.exit()
@@ -71,7 +75,7 @@ while True:
             dist = np.linalg.norm(np.array(blade_pos) - np.array([fruits[i][0], fruits[i][1]]))
             real_type = fruits[i][4]
             
-            if dist < 25:
+            if dist < 60:
                 features = vision.extract_features(frame, int(fruits[i][0]), int(fruits[i][1]))
                 prediction = vision.classify_fruit(features)
 
